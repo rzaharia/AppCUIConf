@@ -13,7 +13,7 @@ using namespace std::literals;
 
 constexpr uint32 ALL_FILES_INDEX = 0xFFFFFFFFU;
 
-void ConvertSizeToString(uint64 size, char result[32])
+static void ConvertSizeToString(uint64 size, char result[32])
 {
     result[31] = 0;
     int poz    = 30;
@@ -36,7 +36,7 @@ void ConvertSizeToString(uint64 size, char result[32])
     }
 }
 
-uint32 __compute_hash__(const char16* start, const char16* end)
+static uint32 __compute_hash__(const char16* start, const char16* end)
 {
     // use FNV algorithm ==> https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
     uint32 hash           = 0x811c9dc5;
@@ -56,7 +56,7 @@ uint32 __compute_hash__(const char16* start, const char16* end)
 }
 
 // https://www.cppstories.com/2018/07/string-view-perf-followup/
-vector<u16string_view> splitSV(u16string_view strv, u16string_view delims = u" ")
+static vector<u16string_view> splitSV(u16string_view strv, u16string_view delims = u" ")
 {
     vector<u16string_view> output;
     size_t first = 0;
@@ -145,21 +145,21 @@ FileDialogWindow::FileDialogWindow(
       const ConstString& fileName,
       const ConstString& extensionsFilter,
       const std::filesystem::path& specifiedPath)
-    : Window(open ? "Open" : "Save", "w:50%,h:75%,d:c", WindowFlags::None), extFilter(nullptr), openDialog(open)
+    : Window(open ? "Open" : "Save", "w:120,h:40,d:c", WindowFlags::None), extFilter(nullptr), openDialog(open)
 {
     const std::filesystem::path initialPath = CanonizePath(specifiedPath.empty() ? "." : specifiedPath);
 
     lbLocation = Factory::Label::Create(this, "Location: ", "x:1,y:0,w:10%");
-    lbPath     = Factory::Label::Create(this, "", "x:11%,y:0,w:88%");
+    lbPath     = Factory::Label::Create(this, "", "x:11%,y:0,w:86%");
 
-    splitListView = Factory::Splitter::Create(this, "x:1,y:2,w:98%,h:88%", SplitterFlags::Vertical);
+    splitListView = Factory::Splitter::Create(this, "x:1,y:2,w:98%,h:82%", SplitterFlags::Vertical);
     splitListView->SetSecondPanelSize(static_cast<uint32>(0.75 * this->GetWidth()));
     splitPanelLeft  = Factory::Panel::Create(splitListView, "x:1,y:0,w:100%,h:100%");
     splitPanelRight = Factory::Panel::Create(splitListView, "x:1,y:0,w:100%,h:100%");
 
     ListViewFlags specialPathsFlags = ListViewFlags::HideColumnsSeparator |
                                       ListViewFlags::HideCurrentItemWhenNotFocused | ListViewFlags::HideBorder |
-                                      ListViewFlags::PopupSearchBar;
+                                      ListViewFlags::PopupSearchBar | ListViewFlags::HideScrollBar;
     lSpecialPaths = Factory::ListView::Create(
           splitPanelLeft, "x:1,y:0,w:100%,h:100%", { "n:Special,a:l,w:20" }, specialPathsFlags);
 
@@ -172,7 +172,8 @@ FileDialogWindow::FileDialogWindow(
     uint64 idx = 0;
     for (const auto& locationInfo : locations)
     {
-        lSpecialPaths->AddItem(locationInfo.locationName).SetData(idx++);
+        auto item = lSpecialPaths->AddItem(locationInfo.locationName);
+        item.SetData(idx++);
     }
 
     files = Factory::ListView::Create(
@@ -202,15 +203,15 @@ FileDialogWindow::FileDialogWindow(
     };
     files->Sort(0, SortDirection::Ascendent); // sort after the first column, ascendent
 
-    lbName = Factory::Label::Create(this, "File &Name", "x:1,y:94%,w:10%");
-    txName = Factory::TextField::Create(this, fileName, "x:11%,y:94%,w:75%", TextFieldFlags::ProcessEnter);
+    lbName = Factory::Label::Create(this, "File &Name", "x:1,y:90%,w:10%");
+    txName = Factory::TextField::Create(this, fileName, "x:11%,y:90%,w:75%", TextFieldFlags::ProcessEnter);
     txName->SetHotKey('N');
-    lbExt = Factory::Label::Create(this, "File &Type", "x:1,y:98%,w:10%");
+    btnOK = Factory::Button::Create(this, "&Ok", "x:87%,y:90%,w:12%", (int) Dialogs::Result::Ok);
 
-    btnOK     = Factory::Button::Create(this, "&Ok", "x:87%,y:94%,w:12%", (int) Dialogs::Result::Ok);
-    btnCancel = Factory::Button::Create(this, "&Cancel", "x:87%,y:98%,w:12%", (int) Dialogs::Result::Cancel);
+    lbExt     = Factory::Label::Create(this, "File &Type", "x:1,y:96%,w:10%");
+    btnCancel = Factory::Button::Create(this, "&Cancel", "x:87%,y:96%,w:12%", (int) Dialogs::Result::Cancel);
 
-    comboType = Factory::ComboBox::Create(this, "x:11%,y:98%,w:75%");
+    comboType = Factory::ComboBox::Create(this, "x:11%,y:96%,w:75%");
     comboType->SetHotKey('T');
     ProcessExtensionFilter(extensionsFilter);
     if (comboType->GetItemsCount() > 0)
@@ -317,6 +318,7 @@ void FileDialogWindow::FileListItemClicked()
         ProcessTextFieldInput();
     }
 }
+
 void FileDialogWindow::FileListItemChanged()
 {
     auto current = files->GetCurrentItem();
@@ -443,45 +445,45 @@ void FileDialogWindow::ReloadCurrentPath()
             {
                 MessageBox::ShowError("Error", u"Unable to read location: "s + fileEntry.path().u16string());
                 Utils::String::Set(size, "Unknown", 32, 7);
-				failed = true; // not really - maybe reparse point
+                failed = true; // not really - maybe reparse point
             }
 
-			if (isDirectory == false)
-			{
-				// check filter first
-				if (extFilter)
-				{
-					// a filter is set - let's check the extention
-					auto ext16 = fileEntry.path().extension().u16string();
-					auto ext16Start = ext16.data();
-					const auto ext16End = ext16.data() + ext16.size();
+            if (isDirectory == false)
+            {
+                // check filter first
+                if (extFilter)
+                {
+                    // a filter is set - let's check the extention
+                    auto ext16          = fileEntry.path().extension().u16string();
+                    auto ext16Start     = ext16.data();
+                    const auto ext16End = ext16.data() + ext16.size();
 
-					if (ext16.length() > 1 && ext16[0] == '.')
-					{
-						ext16Start++;
-					}
-					if (!extFilter->contains(__compute_hash__(ext16Start, ext16End)))
-					{
-						continue; // extension is filtered
-					}
-				}
+                    if (ext16.length() > 1 && ext16[0] == '.')
+                    {
+                        ext16Start++;
+                    }
+                    if (!extFilter->contains(__compute_hash__(ext16Start, ext16End)))
+                    {
+                        continue; // extension is filtered
+                    }
+                }
 
-				if (failed == false)
-				{
-					ConvertSizeToString((uint64)fileEntry.file_size(), size);
-				}
-			}
+                if (failed == false)
+                {
+                    ConvertSizeToString((uint64) fileEntry.file_size(), size);
+                }
+            }
 
             dt.CreateFrom(fileEntry);
             auto item =
                   this->files->AddItem({ fileEntry.path().filename().u16string(), size, dt.GetStringRepresentation() });
-            
-			if (failed)
-			{
-				item.SetType(ListViewItem::Type::ErrorInformation);
-				item.SetData(2);
-			}
-			else if (isDirectory)
+
+            if (failed)
+            {
+                item.SetType(ListViewItem::Type::ErrorInformation);
+                item.SetData(2);
+            }
+            else if (isDirectory)
             {
                 item.SetType(ListViewItem::Type::Highlighted);
                 item.SetData(1);
@@ -605,6 +607,7 @@ optional<std::filesystem::path> FileDialog::ShowSaveFileWindow(
         return dlg.GetResultedPath();
     return std::nullopt;
 }
+
 optional<std::filesystem::path> FileDialog::ShowOpenFileWindow(
       const ConstString& fileName, const ConstString& extensionsFilter, const std::filesystem::path& path)
 {

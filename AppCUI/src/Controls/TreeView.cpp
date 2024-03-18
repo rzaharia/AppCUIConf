@@ -98,7 +98,7 @@ void TreeView::Paint(Graphics::Renderer& renderer)
 
     if (cc->Focused)
     {
-        if ((cc->Layout.Width > (int)TreeSearchBarWidth) && (cc->filter.mode != TreeControlContext::FilterMode::None))
+        if ((cc->Layout.Width > (int) TreeSearchBarWidth) && (cc->filter.mode != TreeControlContext::FilterMode::None))
         {
             renderer.FillHorizontalLine(1, cc->Layout.Height - 1, TreeSearchBarWidth, ' ', cc->Cfg->SearchBar.Normal);
 
@@ -480,7 +480,7 @@ void TreeView::OnFocus()
     cc->Header.RecomputeColumnsSizes();
 }
 
-void TreeView::OnMousePressed(int x, int y, Input::MouseButton button)
+void TreeView::OnMousePressed(int x, int y, Input::MouseButton button, Input::Key keyCode)
 {
     CHECKRET(Context != nullptr, "");
     const auto cc = reinterpret_cast<TreeControlContext*>(Context);
@@ -515,16 +515,16 @@ void TreeView::OnMousePressed(int x, int y, Input::MouseButton button)
     switch (button)
     {
     case Input::MouseButton::None:
-        return ColumnsHeaderView::OnMousePressed(x, y, button);
+        return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
     case Input::MouseButton::Left:
         switch (cc->isMouseOn)
         {
         case TreeControlContext::IsMouseOn::Border:
-            return ColumnsHeaderView::OnMousePressed(x, y, button);
+            return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
         case TreeControlContext::IsMouseOn::ColumnHeader:
-            return ColumnsHeaderView::OnMousePressed(x, y, button);
+            return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
         case TreeControlContext::IsMouseOn::ColumnSeparator:
-            return ColumnsHeaderView::OnMousePressed(x, y, button);
+            return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
         case TreeControlContext::IsMouseOn::ToggleSymbol:
         {
             const uint32 index    = y - 2;
@@ -562,21 +562,21 @@ void TreeView::OnMousePressed(int x, int y, Input::MouseButton button)
         }
         break;
         default:
-            return ColumnsHeaderView::OnMousePressed(x, y, button);
+            return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
         }
         break;
     case Input::MouseButton::Center:
-        return ColumnsHeaderView::OnMousePressed(x, y, button);
+        return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
     case Input::MouseButton::Right:
-        return ColumnsHeaderView::OnMousePressed(x, y, button);
+        return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
     case Input::MouseButton::DoubleClicked:
-        return ColumnsHeaderView::OnMousePressed(x, y, button);
+        return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
     default:
-        return ColumnsHeaderView::OnMousePressed(x, y, button);
+        return ColumnsHeaderView::OnMousePressed(x, y, button, keyCode);
     }
 }
 
-bool TreeView::OnMouseWheel(int /*x*/, int /*y*/, Input::MouseWheel direction)
+bool TreeView::OnMouseWheel(int /*x*/, int /*y*/, Input::MouseWheel direction, Input::Key)
 {
     CHECK(Context != nullptr, false, "");
     const auto cc = reinterpret_cast<TreeControlContext*>(Context);
@@ -598,6 +598,21 @@ bool TreeView::OnMouseWheel(int /*x*/, int /*y*/, Input::MouseWheel direction)
     }
 
     return false;
+}
+
+bool TreeView::OnMouseOver(int x, int y)
+{
+    CHECK(Context != nullptr, false, "");
+    const auto cc = reinterpret_cast<TreeControlContext*>(Context);
+    if (cc->IsMouseOnSearchField(x, y))
+    {
+        this->ShowToolTip("Search/Filter", x, cc->Layout.Height - 1);
+    }
+    else
+    {
+        this->HideToolTip();
+    }
+    return true;
 }
 
 void TreeView::OnUpdateScrollBars()
@@ -1307,7 +1322,8 @@ bool TreeControlContext::IsMouseOnItem(int x, int y) const
 
 bool TreeControlContext::IsMouseOnBorder(int x, int y) const
 {
-    return ((x == 0) || (x == Layout.Width - (int)BorderOffset) || (y == 0) || (y == Layout.Width - (int)BorderOffset));
+    return (
+          (x == 0) || (x == Layout.Width - (int) BorderOffset) || (y == 0) || (y == Layout.Width - (int) BorderOffset));
 }
 
 bool TreeControlContext::IsMouseOnColumnHeader(int x, int y)
@@ -1356,7 +1372,7 @@ bool TreeControlContext::IsMouseOnSearchField(int x, int y) const
     {
         if (y == Layout.Height - 1)
         {
-            if ((x > 0) && (x < (int)TreeSearchBarWidth))
+            if ((x > 0) && (x < (int) TreeSearchBarWidth))
             {
                 return true;
             }
@@ -1370,7 +1386,8 @@ bool TreeControlContext::AdjustElementsOnResize(const int /*newWidth*/, const in
 {
     CHECK(AdjustItemsBoundsOnResize(), false, "");
     const auto columnsSize = this->Header.GetColumnsCount();
-    //const uint32 width = (static_cast<uint32>(Layout.Width)) / static_cast<uint32>(std::max<uint32>(columnsSize, 1U));
+    // const uint32 width = (static_cast<uint32>(Layout.Width)) / static_cast<uint32>(std::max<uint32>(columnsSize,
+    // 1U));
 
     uint32 xPreviousColumn       = 0;
     uint32 widthOfPreviousColumn = 0;
@@ -1382,7 +1399,7 @@ bool TreeControlContext::AdjustElementsOnResize(const int /*newWidth*/, const in
         widthOfPreviousColumn = col.width;
     }
 
-    if (Layout.Width <= (int)TreeScrollbarLeftOffset)
+    if (Layout.Width <= (int) TreeScrollbarLeftOffset)
     {
         if (hidSearchBarOnResize == false)
         {
